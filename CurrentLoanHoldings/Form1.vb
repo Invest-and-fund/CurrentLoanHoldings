@@ -154,7 +154,8 @@ Public Class Form1
                                 loan_holdings lh,
                                 lh_pos_balances lhb
 
-                            INNER JOIN users u on u.userid = lhb.accountid
+                            INNER JOIN accounts a on a.accountid = lhb.accountid
+                            inner join users u on u.userid = a.userid
 
                             FULL JOIN lh_pos_balances_suspense lhs
                                     ON lhb.accountid = lhs.accountid
@@ -165,7 +166,8 @@ Public Class Form1
                                    AND o.lh_id = lh.loan_holdings_id 
                     
                                    AND l.loanstatus in (2, 4)
-                                   AND u.userid = lhb.accountid
+                                   AND a.accountid = lhb.accountid
+                                   AND u.userid = a.userid
                                    AND u.usertype = 0
                                    AND l.loanid not in (54, 58, 60, 89, 293)
 
