@@ -12,6 +12,7 @@ Imports System.Data
 Imports System.Data.SqlClient
 
 
+
 Public Class Form1
     Public Class Extract
         Property AccountID As Integer
@@ -35,6 +36,9 @@ Public Class Form1
         Property LHAmount As Decimal
     End Class
 
+    Public Shared ReadOnly Property FBSQLEnv As String = System.Configuration.ConfigurationManager.AppSettings("RunFBSQL")
+    Public Shared ReadOnly Property UpdateFBSQLEnv As String = System.Configuration.ConfigurationManager.AppSettings("UpdateFBSQL")
+
     Private Sub Form1_Load(sender As Object, e As EventArgs) Handles MyBase.Load
         Dim dateentered As String = Today.ToString("yyyy/MM/01")
         ExtRunDate.Text = dateentered
@@ -55,24 +59,30 @@ Public Class Form1
         Dim dateentered As Date = ExtRunDate.Text
         Dim DisplayDate As String = ExtRunDate.Text
 
-
+        Dim nLoanStatus As Int16 = 0
+        Dim dLoanEndDate As Date
+        Dim nLoanid As Integer
 
 
 
         DisplayDate = DisplayDate.Replace("/", "-")
 
         dExtractDate = dateentered
+        Dim ExtractList As New List(Of Extract)
+        Dim SummaryList As New List(Of Summary)
+
+        If FBSQLEnv = "FB" Then
 
 
 
-        Dim connection As String = "FBConnectionString"
+            Dim connection As String = "FBConnectionString"
 
 
-        Dim Cmd As New FirebirdSql.Data.FirebirdClient.FbCommand With {
-            .Connection = New FirebirdSql.Data.FirebirdClient.FbConnection(ConfigurationManager.ConnectionStrings(environ & connection).ConnectionString),
-            .CommandType = CommandType.Text
-        }
-        Cmd.CommandText = "CREATE OR ALTER VIEW LH_POS_BALANCES(
+            Dim Cmd As New FirebirdSql.Data.FirebirdClient.FbCommand With {
+                .Connection = New FirebirdSql.Data.FirebirdClient.FbConnection(ConfigurationManager.ConnectionStrings(environ & connection).ConnectionString),
+                .CommandType = CommandType.Text
+            }
+            Cmd.CommandText = "CREATE OR ALTER VIEW LH_POS_BALANCES(
                 ACCOUNTID,
                LH_ID,
             LH_BALS_ID,
@@ -91,49 +101,49 @@ Public Class Form1
             inner join lh_bals t on t.lh_bals_id = vt.maxlhbalsid
             where t.num_units > 0
             ;"
-        Cmd.Connection.Open()
+            Cmd.Connection.Open()
 
-        Cmd.ExecuteNonQuery()
+            Cmd.ExecuteNonQuery()
 
-        Cmd = New FirebirdSql.Data.FirebirdClient.FbCommand With {
-            .Connection = New FirebirdSql.Data.FirebirdClient.FbConnection(ConfigurationManager.ConnectionStrings(environ & connection).ConnectionString),
-            .CommandType = CommandType.Text
-        }
-        Cmd.CommandText = "CREATE OR ALTER VIEW LH_POS_BALANCES_SUSPENSE(
-        ACCOUNTID,
-        LH_ID,
-        LH_BALS_ID,
-        NUM_UNITS)
-        AS
-        select vt.accountid, lh_id, max_lh_bals_sus_id, t.num_units
-        from 
-        ( 
-        select accountid, max(lh_bals_suspense_id) as max_lh_bals_sus_id
-        from lh_bals_suspense s
-        where lh_id > 0
-        and s.datecreated < '" & DisplayDate & "'
-        group by accountid, lh_id
-        ) vt
-        inner join lh_bals_suspense t on t.lh_bals_suspense_id = vt.max_lh_bals_sus_id
-        where t.num_units > 0
-        ;"
-        Cmd.Connection.Open()
+            Cmd = New FirebirdSql.Data.FirebirdClient.FbCommand With {
+                .Connection = New FirebirdSql.Data.FirebirdClient.FbConnection(ConfigurationManager.ConnectionStrings(environ & connection).ConnectionString),
+                .CommandType = CommandType.Text
+            }
+            Cmd.CommandText = "CREATE OR ALTER VIEW LH_POS_BALANCES_SUSPENSE(
+                ACCOUNTID,
+               LH_ID,
+                LH_BALS_ID,
+                NUM_UNITS)
+                AS
+               select vt.accountid, lh_id, max_lh_bals_sus_id, t.num_units
+                from 
+               ( 
+                select accountid, max(lh_bals_suspense_id) as max_lh_bals_sus_id
+                from lh_bals_suspense s
+               where lh_id > 0
+                and s.datecreated < '" & DisplayDate & "'
+                group by accountid, lh_id
+                ) vt
+                inner join lh_bals_suspense t on t.lh_bals_suspense_id = vt.max_lh_bals_sus_id
+                where t.num_units > 0
+               ;"
+            Cmd.Connection.Open()
 
-        Cmd.ExecuteNonQuery()
+            Cmd.ExecuteNonQuery()
 
-        Cmd.Connection.Close()
-
-
+            Cmd.Connection.Close()
 
 
-        connection = "FBConnectionString"
-        Dim Reader As FirebirdSql.Data.FirebirdClient.FbDataReader = Nothing
 
-        Cmd = New FirebirdSql.Data.FirebirdClient.FbCommand With {
-            .Connection = New FirebirdSql.Data.FirebirdClient.FbConnection(ConfigurationManager.ConnectionStrings(environ & connection).ConnectionString),
-            .CommandType = CommandType.Text
-        }
-        Cmd.CommandText = "SELECT
+
+            connection = "FBConnectionString"
+            Dim Reader As FirebirdSql.Data.FirebirdClient.FbDataReader = Nothing
+
+            Cmd = New FirebirdSql.Data.FirebirdClient.FbCommand With {
+                .Connection = New FirebirdSql.Data.FirebirdClient.FbConnection(ConfigurationManager.ConnectionStrings(environ & connection).ConnectionString),
+                .CommandType = CommandType.Text
+            }
+            Cmd.CommandText = "SELECT
                                 lhb.accountid as AccountID,
                                 Trim(u.firstname) as FirstName,
                                 Trim(u.lastname) as LastName,
@@ -184,120 +194,120 @@ Public Class Form1
                                     DateOfLoan,
                                     DateOfRepayment,
                                     TotalFacilityAmount"
-        Cmd.Connection.Open()
-        Reader = Cmd.ExecuteReader()
+            Cmd.Connection.Open()
+            Reader = Cmd.ExecuteReader()
 
-        '####
-        'if running against a specific date instead of running against the current date then change the references in the above SQL for lh_balances and lh_balances_suspense  
-        '                                                                                                                            to lh_pos_balances and lh_pos_balances_suspense
-        'there also needs to be views created on Shadow - (run the Replicator then run this against Shadow) - which are copies of the lh_balances and lh_balances_suspense  
-        '      called lh_pos_balances and lh_pos_balances_suspense. these need to have the line --->     and l.datecreated <= '2019-01-15'  
-        '                                                                                   or  --->     and s.datecreated <= '2019-01-15' (change dates accordingly) added to them
-        '####
-        Dim ExtractList As New List(Of Extract)
+            '####
+            'if running against a specific date instead of running against the current date then change the references in the above SQL for lh_balances and lh_balances_suspense  
+            '                                                                                                                            to lh_pos_balances and lh_pos_balances_suspense
+            'there also needs to be views created on Shadow - (run the Replicator then run this against Shadow) - which are copies of the lh_balances and lh_balances_suspense  
+            '      called lh_pos_balances and lh_pos_balances_suspense. these need to have the line --->     and l.datecreated <= '2019-01-15'  
+            '                                                                                   or  --->     and s.datecreated <= '2019-01-15' (change dates accordingly) added to them
+            '####
 
-        Dim nLoanStatus As Int16 = 0
-        Dim dLoanEndDate As Date
-        Dim nLoanid As Integer
 
-        Do While Reader.Read()
-            Dim newExtract As New Extract
-            newExtract.AccountID = IIf(IsDBNull(Reader(0)), "", Reader(0))
-            newExtract.Firstname = IIf(IsDBNull(Reader(1)), "", Reader(1))
-            newExtract.LastName = IIf(IsDBNull(Reader(2)), "", Reader(2))
-            newExtract.CompanyName = IIf(IsDBNull(Reader(3)), "", Reader(3))
-            newExtract.LoanID = IIf(IsDBNull(Reader(4)), "", Reader(4))
-            nLoanid = IIf(IsDBNull(Reader(4)), "", Reader(4))
-            newExtract.LHBalID = IIf(IsDBNull(Reader(5)), "", Reader(5))
-            newExtract.LHID = IIf(IsDBNull(Reader(6)), "", Reader(6))
-            newExtract.OrderID = IIf(IsDBNull(Reader(7)), "", Reader(7))
-            newExtract.Outstanding = IIf(IsDBNull(Reader(8)), 0, Reader(8))
-            newExtract.Loanstatus = IIf(IsDBNull(Reader(9)), "", Reader(9))
-            nLoanStatus = IIf(IsDBNull(Reader(9)), "", Reader(9))
-            newExtract.DateOfAcquisition = "#01/01/0001#"
-            newExtract.DateOfLoan = IIf(IsDBNull(Reader(10)), "#01/01/0001#", Reader(10))
-            newExtract.DateOfRepayment = IIf(IsDBNull(Reader(11)), "#01/01/0001#", Reader(11))
-            dLoanEndDate = IIf(IsDBNull(Reader(11)), "#01/01/0001#", Reader(11))
-            newExtract.TotalFacilityAmount = IIf(IsDBNull(Reader(12)), 0, Reader(12) / 100)
 
-            Dim TheEnd As String = "break here"
 
-            If nLoanid = 370 Then
-                TheEnd = "370"
-            End If
+            Do While Reader.Read()
+                Dim newExtract As New Extract
+                newExtract.AccountID = IIf(IsDBNull(Reader(0)), "", Reader(0))
+                newExtract.Firstname = IIf(IsDBNull(Reader(1)), "", Reader(1))
+                newExtract.LastName = IIf(IsDBNull(Reader(2)), "", Reader(2))
+                newExtract.CompanyName = IIf(IsDBNull(Reader(3)), "", Reader(3))
+                newExtract.LoanID = IIf(IsDBNull(Reader(4)), "", Reader(4))
+                nLoanid = IIf(IsDBNull(Reader(4)), "", Reader(4))
+                newExtract.LHBalID = IIf(IsDBNull(Reader(5)), "", Reader(5))
+                newExtract.LHID = IIf(IsDBNull(Reader(6)), "", Reader(6))
+                newExtract.OrderID = IIf(IsDBNull(Reader(7)), "", Reader(7))
+                newExtract.Outstanding = IIf(IsDBNull(Reader(8)), 0, Reader(8))
+                newExtract.Loanstatus = IIf(IsDBNull(Reader(9)), "", Reader(9))
+                nLoanStatus = IIf(IsDBNull(Reader(9)), "", Reader(9))
+                newExtract.DateOfAcquisition = "#01/01/0001#"
+                newExtract.DateOfLoan = IIf(IsDBNull(Reader(10)), "#01/01/0001#", Reader(10))
+                newExtract.DateOfRepayment = IIf(IsDBNull(Reader(11)), "#01/01/0001#", Reader(11))
+                dLoanEndDate = IIf(IsDBNull(Reader(11)), "#01/01/0001#", Reader(11))
+                newExtract.TotalFacilityAmount = IIf(IsDBNull(Reader(12)), 0, Reader(12) / 100)
 
-            If nLoanStatus = 4 Then
+                Dim TheEnd As String = "break here"
 
-                If dLoanEndDate < dExtractDate Then
+                If nLoanid = 370 Then
+                    TheEnd = "370"
+                End If
+
+                If nLoanStatus = 4 Then
+
+                    If dLoanEndDate < dExtractDate Then
+                    Else
+                        ExtractList.Add(newExtract)
+                    End If
                 Else
                     ExtractList.Add(newExtract)
                 End If
-            Else
-                ExtractList.Add(newExtract)
-            End If
 
-        Loop
+            Loop
 
 
 
 
-        Reader = Nothing
- 
-
-        'thi is where the date of acquisition is added to the table
-
-        'Dim TransList As New List(Of Trans)
-        Dim nAccountID As Integer
-        Dim nOrderID As Integer
-        Dim nOrderPrev As Integer
-        Dim nLHID As Integer
+            Reader = Nothing
 
 
-        Dim sAccountID As Integer = 0
-        Dim sOrderID As Integer = 0
+            'thi is where the date of acquisition is added to the table
 
-        Dim SummaryList As New List(Of Summary)
-        Dim xPrevAccount As String = ""
-        Dim xLatestAccount As String
-
-        Dim newSummary As Summary
-        Dim nAccountTotal As Decimal = 0
-
-        sAccountID = 0
-        sOrderID = 0
+            'Dim TransList As New List(Of Trans)
+            Dim nAccountID As Integer
+            Dim nOrderID As Integer
+            Dim nOrderPrev As Integer
+            Dim nLHID As Integer
 
 
-        For Each Extract In ExtractList
-            nAccountID = Extract.AccountID
-            nLHID = Extract.LHID
-            nOrderID = Extract.OrderID
-            nLoanid = Extract.LoanID
-            nOrderPrev = 0
+            Dim sAccountID As Integer = 0
+            Dim sOrderID As Integer = 0
 
-            
-            Cmd.CommandText = "Select o.lh_id, o.accountid, o.loanid, o.orderprev, o.orderid
+
+            Dim xPrevAccount As String = ""
+            Dim xLatestAccount As String
+
+            Dim newSummary As Summary
+            Dim nAccountTotal As Decimal = 0
+
+
+
+            sAccountID = 0
+            sOrderID = 0
+
+
+            For Each Extract In ExtractList
+                nAccountID = Extract.AccountID
+                nLHID = Extract.LHID
+                nOrderID = Extract.OrderID
+                nLoanid = Extract.LoanID
+                nOrderPrev = 0
+
+
+                Cmd.CommandText = "Select o.lh_id, o.accountid, o.loanid, o.orderprev, o.orderid
                                 From orders  o
                                 WHERE  o.accountid = @iaccountid
                                 And (o.lh_id = @ilhid
                                  or o.loanid = @iloanid)
                                 Order By o.lh_id desc, o.loanid desc,  o.orderprev desc, o.accountid  "
-            Cmd.Parameters.Clear()
+                Cmd.Parameters.Clear()
 
-            Cmd.Parameters.Add("@iaccountid", FirebirdSql.Data.FirebirdClient.FbDbType.Integer).Value = nAccountID
-            Cmd.Parameters.Add("@ilhid", FirebirdSql.Data.FirebirdClient.FbDbType.Integer).Value = nLHID
-            Cmd.Parameters.Add("@iloanid", FirebirdSql.Data.FirebirdClient.FbDbType.Integer).Value = nLoanID
+                Cmd.Parameters.Add("@iaccountid", FirebirdSql.Data.FirebirdClient.FbDbType.Integer).Value = nAccountID
+                Cmd.Parameters.Add("@ilhid", FirebirdSql.Data.FirebirdClient.FbDbType.Integer).Value = nLHID
+                Cmd.Parameters.Add("@iloanid", FirebirdSql.Data.FirebirdClient.FbDbType.Integer).Value = nLoanID
 
-            Reader = Cmd.ExecuteReader()
+                Reader = Cmd.ExecuteReader()
 
-            If Reader.Read() Then
-                Extract.OrderID = IIf(IsDBNull(Reader(4)), "", Reader(4))
-                nOrderID = Extract.OrderID
-                nOrderPrev = IIf(IsDBNull(Reader(3)), 0, Reader(3))
-            End If
-            Reader.Close()
+                If Reader.Read() Then
+                    Extract.OrderID = IIf(IsDBNull(Reader(4)), "", Reader(4))
+                    nOrderID = Extract.OrderID
+                    nOrderPrev = IIf(IsDBNull(Reader(3)), 0, Reader(3))
+                End If
+                Reader.Close()
 
 
-            Cmd.CommandText = "SELECT
+                Cmd.CommandText = "SELECT
                                 ft.datecreated
                               FROM
                                 fin_trans ft
@@ -305,56 +315,345 @@ Public Class Form1
                                 AND ft.accountid = @iaccountid
                                 AND (ft.orderid = @iorderid
                                 Or ft.orderid = @iorderprev)"
-            Cmd.Parameters.Clear()
+                Cmd.Parameters.Clear()
 
-            Cmd.Parameters.Add("@iaccountid", FirebirdSql.Data.FirebirdClient.FbDbType.Integer).Value = nAccountID
-            Cmd.Parameters.Add("@iorderid", FirebirdSql.Data.FirebirdClient.FbDbType.Integer).Value = nOrderID
-            Cmd.Parameters.Add("@iorderprev", FirebirdSql.Data.FirebirdClient.FbDbType.Integer).Value = nOrderPrev
+                Cmd.Parameters.Add("@iaccountid", FirebirdSql.Data.FirebirdClient.FbDbType.Integer).Value = nAccountID
+                Cmd.Parameters.Add("@iorderid", FirebirdSql.Data.FirebirdClient.FbDbType.Integer).Value = nOrderID
+                Cmd.Parameters.Add("@iorderprev", FirebirdSql.Data.FirebirdClient.FbDbType.Integer).Value = nOrderPrev
 
-            Reader = Cmd.ExecuteReader
+                Reader = Cmd.ExecuteReader
 
 
-            If Reader.Read() Then
-                Extract.DateOfAcquisition = IIf(IsDBNull(Reader(0)), "", Reader(0))
+                If Reader.Read() Then
+                    Extract.DateOfAcquisition = IIf(IsDBNull(Reader(0)), "", Reader(0))
 
-            End If
-            Reader.Close()
+                End If
+                Reader.Close()
 
-            xLatestAccount = Extract.AccountID & " - " & Extract.Firstname.Trim & " " & Extract.LastName.Trim
-            nAccountID = Extract.AccountID
-            nOrderID = Extract.OrderID
-            '      Reader = Nothing
-            sAccountID = 0
-            sOrderID = 0
+                xLatestAccount = Extract.AccountID & " - " & Extract.Firstname.Trim & " " & Extract.LastName.Trim
+                nAccountID = Extract.AccountID
+                nOrderID = Extract.OrderID
+                '      Reader = Nothing
+                sAccountID = 0
+                sOrderID = 0
 
-            If xLatestAccount <> xPrevAccount Then
+                If xLatestAccount <> xPrevAccount Then
 
-                If xPrevAccount <> "" Then
+                    If xPrevAccount <> "" Then
+                        newSummary = New Summary With {
+                            .Fullname = xPrevAccount,
+                            .LHAmount = nAccountTotal}
+
+                        SummaryList.Add(newSummary)
+                        nAccountTotal = 0
+                    End If
+                End If
+                nAccountTotal = Extract.Outstanding + nAccountTotal
+                xPrevAccount = xLatestAccount
+            Next
+
+            'once we have read and processed the final record we need to write it away
+            newSummary = New Summary With {
+                            .Fullname = xPrevAccount,
+                            .LHAmount = nAccountTotal}
+
+            SummaryList.Add(newSummary)
+            nAccountTotal = 0
+
+            Cmd.Connection.Close()
+            Reader = Nothing
+            Cmd.Connection = Nothing
+            Cmd = Nothing
+
+        Else 'SQL code
+
+            Dim sSQL As String
+            Dim sErrorStr As String = ""
+            Using con As New SqlConnection(System.Configuration.ConfigurationManager.ConnectionStrings("SQLConnectionString").ConnectionString)
+
+                con.Open()
+
+                Dim command As SqlCommand = con.CreateCommand()
+                command.Connection = con
+                command.CommandType = CommandType.Text
+                
+                Try
+                    sSQL = "CREATE OR ALTER VIEW LH_POS_BALANCES(
+                      ACCOUNTID,
+                      LH_ID,
+                    LH_BALS_ID,
+                    NUM_UNITS)
+                    AS
+                    select t.accountid, t.lh_id, maxlhbalsid, t.num_units
+                   from
+                      (
+                    select  max(l.lh_bals_id) as maxlhbalsid,l.lhid_accid, lh_id, accountid
+                      from lh_bals l
+                 where lh_id >= 0
+                  and l.datecreated < '" & DisplayDate & "'
+                  group by l.lhid_accid, lh_id, accountid
+                  order by lhid_accid
+                     ) vt
+                      inner join lh_bals t on t.lh_bals_id = vt.maxlhbalsid
+                      where t.num_units > 0
+                     ;"
+                    command.CommandText = sSQL
+                    command.ExecuteNonQuery()
+
+                Catch ex As Exception
+
+                End Try
+
+                Try
+                    sSQL = "CREATE OR ALTER VIEW LH_POS_BALANCES_SUSPENSE(
+                   ACCOUNTID,
+                    LH_ID,
+                    LH_BALS_ID,
+                    NUM_UNITS)
+                    AS
+                   select vt.accountid, lh_id, max_lh_bals_sus_id, t.num_units
+                   from 
+                    ( 
+                    select accountid, max(lh_bals_suspense_id) as max_lh_bals_sus_id
+                    from lh_bals_suspense s
+                    where lh_id > 0
+                   and s.datecreated < '" & DisplayDate & "'
+                  group by accountid, lh_id
+                   ) vt
+                  inner join lh_bals_suspense t on t.lh_bals_suspense_id = vt.max_lh_bals_sus_id
+                   where t.num_units > 0
+                     ;"
+                    command.CommandText = sSQL
+                    command.ExecuteNonQuery()
+                Catch ex As Exception
+
+                End Try
+
+                Dim Rdr As SqlDataReader
+
+                Try
+                    sSQL = " SELECT
+                                lhb.accountid as AccountID,
+                                Trim(u.firstname) as FirstName,
+                                Trim(u.lastname) as LastName,
+                                Trim(l.business_name) AS CompanyName,
+                                l.loanid AS TheLoan,
+                                lhb.lh_bals_id,
+                                o.lh_id,
+                                0 as TheOrder,
+                                COALESCE(Cast(lhb.num_units AS FLOAT)/100, 0)
+                                    + COALESCE(Cast(lhS.num_units AS FLOAT)/100, 0) AS outstanding,
+                                l.loanstatus,
+                                l.ipo_end as DateOfLoan,
+                                l.DATE_OF_LAST_PAYMENT as DateOfRepayment,
+                                l.facility_amount as TotalFacilityAmount
+
+                            FROM orders o,
+                                loans l,
+                                loan_holdings lh,
+                                lh_pos_balances lhb
+
+                            INNER JOIN accounts a on a.accountid = lhb.accountid
+                            inner join users u on u.userid = a.userid
+
+                            FULL JOIN lh_pos_balances_suspense lhs
+                                    ON lhb.accountid = lhs.accountid
+                                   AND lhb.lh_id = lhs.lh_id
+                                   
+                                 WHERE lh.loan_holdings_id = lhb.lh_id
+                                   AND l.loanid = lh.loanid
+                                   AND o.lh_id = lh.loan_holdings_id 
+                    
+                                   AND l.loanstatus in (2, 4)
+                                   AND a.accountid = lhb.accountid
+                                   AND u.userid = a.userid
+                                   AND u.usertype = 0
+                                   AND l.loanid not in (54, 58, 60, 89, 293)
+
+                                GROUP BY
+                                    AccountID,
+                                    FirstName,
+                                    LastName,
+                                    CompanyName,
+                                    TheLoan,
+                                    lhb.lh_bals_id,
+                                    lh_id,
+                                    outstanding,
+                                    l.loanstatus,
+                                    DateOfLoan,
+                                    DateOfRepayment,
+                                    TotalFacilityAmount"
+
+                    Dim cmd As SqlCommand = New SqlCommand(sSQL, con)
+                    cmd.Parameters.Clear()
+                    
+                    con.Open()
+
+                    Rdr = cmd.ExecuteReader
+
+
+                    Do While Rdr.Read()
+                        Dim newExtract As New Extract
+                        newExtract.AccountID = IIf(IsDBNull(Rdr(0)), "", Rdr(0))
+                        newExtract.Firstname = IIf(IsDBNull(Rdr(1)), "", Rdr(1))
+                        newExtract.LastName = IIf(IsDBNull(Rdr(2)), "", Rdr(2))
+                        newExtract.CompanyName = IIf(IsDBNull(Rdr(3)), "", Rdr(3))
+                        newExtract.LoanID = IIf(IsDBNull(Rdr(4)), "", Rdr(4))
+                        nLoanid = IIf(IsDBNull(Rdr(4)), "", Rdr(4))
+                        newExtract.LHBalID = IIf(IsDBNull(Rdr(5)), "", Rdr(5))
+                        newExtract.LHID = IIf(IsDBNull(Rdr(6)), "", Rdr(6))
+                        newExtract.OrderID = IIf(IsDBNull(Rdr(7)), "", Rdr(7))
+                        newExtract.Outstanding = IIf(IsDBNull(Rdr(8)), 0, Rdr(8))
+                        newExtract.Loanstatus = IIf(IsDBNull(Rdr(9)), "", Rdr(9))
+                        nLoanStatus = IIf(IsDBNull(Rdr(9)), "", Rdr(9))
+                        newExtract.DateOfAcquisition = "#01/01/0001#"
+                        newExtract.DateOfLoan = IIf(IsDBNull(Rdr(10)), "#01/01/0001#", Rdr(10))
+                        newExtract.DateOfRepayment = IIf(IsDBNull(Rdr(11)), "#01/01/0001#", Rdr(11))
+                        dLoanEndDate = IIf(IsDBNull(Rdr(11)), "#01/01/0001#", Rdr(11))
+                        newExtract.TotalFacilityAmount = IIf(IsDBNull(Rdr(12)), 0, Rdr(12) / 100)
+
+                        Dim TheEnd As String = "break here"
+
+                        If nLoanid = 370 Then
+                            TheEnd = "370"
+                        End If
+
+                        If nLoanStatus = 4 Then
+
+                            If dLoanEndDate < dExtractDate Then
+                            Else
+                                ExtractList.Add(newExtract)
+                            End If
+                        Else
+                            ExtractList.Add(newExtract)
+                        End If
+
+                    Loop
+
+
+
+
+                    Rdr = Nothing
+                    'thi is where the date of acquisition is added to the table
+
+                    'Dim TransList As New List(Of Trans)
+                    Dim nAccountID As Integer
+                    Dim nOrderID As Integer
+                    Dim nOrderPrev As Integer
+                    Dim nLHID As Integer
+
+
+                    Dim sAccountID As Integer = 0
+                    Dim sOrderID As Integer = 0
+
+
+                    Dim xPrevAccount As String = ""
+                    Dim xLatestAccount As String
+
+                    Dim newSummary As Summary
+                    Dim nAccountTotal As Decimal = 0
+
+                    sAccountID = 0
+                    sOrderID = 0
+
+                    For Each Extract In ExtractList
+                        nAccountID = Extract.AccountID
+                        nLHID = Extract.LHID
+                        nOrderID = Extract.OrderID
+                        nLoanid = Extract.LoanID
+                        nOrderPrev = 0
+
+                        sSQL = "Select o.lh_id, o.accountid, o.loanid, o.orderprev, o.orderid
+                                From orders  o
+                                WHERE  o.accountid = @iaccountid
+                                And (o.lh_id = @ilhid
+                                 or o.loanid = @iloanid)
+                                Order By o.lh_id desc, o.loanid desc,  o.orderprev desc, o.accountid  "
+
+
+                        cmd = New SqlCommand(sSQL, con)
+                        cmd.Parameters.Clear()
+                        With cmd.Parameters
+                            .Add(New SqlParameter("@iaccountid", nAccountID))
+                            .Add(New SqlParameter("@ilhid", nLHID))
+                            .Add(New SqlParameter("@iloanid", nLoanid))
+                        End With
+                        con.Open()
+
+                        Rdr = cmd.ExecuteReader
+
+                        If Rdr.Read() Then
+                            Extract.OrderID = IIf(IsDBNull(Rdr(4)), "", Rdr(4))
+                            nOrderID = Extract.OrderID
+                            nOrderPrev = IIf(IsDBNull(Rdr(3)), 0, Rdr(3))
+                        End If
+                        Rdr.Close()
+
+                        sSQL = "SELECT
+                                ft.datecreated
+                              FROM
+                                fin_trans ft
+                              WHERE ft.transtype in (1206, 1401)
+                                AND ft.accountid = @iaccountid
+                                AND (ft.orderid = @iorderid
+                                Or ft.orderid = @iorderprev)"
+
+
+                        cmd = New SqlCommand(sSQL, con)
+                        cmd.Parameters.Clear()
+                        With cmd.Parameters
+                            .Add(New SqlParameter("@iaccountid", nAccountID))
+                            .Add(New SqlParameter("@iorderid", nOrderID))
+                            .Add(New SqlParameter("@iorderprev", nOrderPrev))
+                        End With
+                        con.Open()
+
+                        Rdr = cmd.ExecuteReader
+                        If Rdr.Read() Then
+                            Extract.DateOfAcquisition = IIf(IsDBNull(Rdr(0)), "", Rdr(0))
+
+                        End If
+                        Rdr.Close()
+
+                        xLatestAccount = Extract.AccountID & " - " & Extract.Firstname.Trim & " " & Extract.LastName.Trim
+                        nAccountID = Extract.AccountID
+                        nOrderID = Extract.OrderID
+                        '      Reader = Nothing
+                        sAccountID = 0
+                        sOrderID = 0
+
+                        If xLatestAccount <> xPrevAccount Then
+
+                            If xPrevAccount <> "" Then
+                                newSummary = New Summary With {
+                                    .Fullname = xPrevAccount,
+                                    .LHAmount = nAccountTotal}
+
+                                SummaryList.Add(newSummary)
+                                nAccountTotal = 0
+                            End If
+                        End If
+                        nAccountTotal = Extract.Outstanding + nAccountTotal
+                        xPrevAccount = xLatestAccount
+                    Next
+                    'once we have read and processed the final record we need to write it away
                     newSummary = New Summary With {
-                        .Fullname = xPrevAccount,
-                        .LHAmount = nAccountTotal}
+                                    .Fullname = xPrevAccount,
+                                    .LHAmount = nAccountTotal}
 
                     SummaryList.Add(newSummary)
                     nAccountTotal = 0
-                End If
-            End If
-            nAccountTotal = Extract.Outstanding + nAccountTotal
-            xPrevAccount = xLatestAccount
-        Next
+                Catch ex As Exception
+                    sErrorStr = sErrorStr & vbNewLine & ex.Message
+                Finally
 
-        'once we have read and processed the final record we need to write it away
-        newSummary = New Summary With {
-                        .Fullname = xPrevAccount,
-                        .LHAmount = nAccountTotal}
+                End Try
 
-        SummaryList.Add(newSummary)
-        nAccountTotal = 0
+                con.Close()
 
-        Cmd.Connection.Close()
-        Reader = Nothing
-        Cmd.Connection = Nothing
-        Cmd = Nothing
+            End Using
 
+        End If
         DataGridView1.DataSource = ExtractList
         DataGridView2.DataSource = SummaryList
 
