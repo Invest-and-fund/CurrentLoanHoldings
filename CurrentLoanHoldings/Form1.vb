@@ -247,9 +247,9 @@ Public Class Form1
             Loop
 
 
+            Reader.Close()
 
-
-            Reader = Nothing
+            'Reader = Nothing
 
 
             'thi is where the date of acquisition is added to the table
@@ -428,25 +428,26 @@ Public Class Form1
                 Catch ex As Exception
 
                 End Try
-
-                Dim Rdr As SqlDataReader
+                con.Close()
+                Dim Rdr, Rdr2, Rdr3 As SqlDataReader
 
                 Try
-                    sSQL = " SELECT
-                                lhb.accountid as AccountID,
-                                Trim(u.firstname) as FirstName,
-                                Trim(u.lastname) as LastName,
-                                Trim(l.business_name) AS CompanyName,
+                    con.Open()
+                    sSQL = "  SELECT
+                                lhb.accountid as TheAccountID,
+                                Trim(u.firstname) as TheFirstName,
+                                Trim(u.lastname) as TheLastName,
+                                Trim(l.business_name) AS TheCompanyName,
                                 l.loanid AS TheLoan,
-                                lhb.lh_bals_id,
-                                o.lh_id,
+                                lhb.lh_bals_id as Thelhbalsid,
+                                o.lh_id as Thelhid,
                                 0 as TheOrder,
                                 COALESCE(Cast(lhb.num_units AS FLOAT)/100, 0)
-                                    + COALESCE(Cast(lhS.num_units AS FLOAT)/100, 0) AS outstanding,
+                                    + COALESCE(Cast(lhS.num_units AS FLOAT)/100, 0) AS Theoutstanding,
                                 l.loanstatus,
-                                l.ipo_end as DateOfLoan,
-                                l.DATE_OF_LAST_PAYMENT as DateOfRepayment,
-                                l.facility_amount as TotalFacilityAmount
+                                l.ipo_end as TheDateOfLoan,
+                                l.DATE_OF_LAST_PAYMENT as TheDateOfRepayment,
+                                l.facility_amount as TheTotalFacilityAmount
 
                             FROM orders o,
                                 loans l,
@@ -471,23 +472,24 @@ Public Class Form1
                                    AND l.loanid not in (54, 58, 60, 89, 293)
 
                                 GROUP BY
-                                    AccountID,
-                                    FirstName,
-                                    LastName,
-                                    CompanyName,
-                                    TheLoan,
+                                    lhb.accountid,
+                                    u.firstname,
+                                    u.lastname,
+                                    l.business_name,
+                                    l.loanid,
                                     lhb.lh_bals_id,
-                                    lh_id,
-                                    outstanding,
+                                    o.lh_id,
+                                    lhb.num_units,
+									lhS.num_units,
                                     l.loanstatus,
-                                    DateOfLoan,
-                                    DateOfRepayment,
-                                    TotalFacilityAmount"
+                                    l.ipo_end,
+                                    l.DATE_OF_LAST_PAYMENT,
+                                    l.facility_amount"
 
                     Dim cmd As SqlCommand = New SqlCommand(sSQL, con)
                     cmd.Parameters.Clear()
-                    
-                    con.Open()
+
+
 
                     Rdr = cmd.ExecuteReader
 
@@ -531,9 +533,11 @@ Public Class Form1
                     Loop
 
 
-
-
+                    Rdr.Close()
+                    'con.Close()
                     Rdr = Nothing
+                    Rdr2 = Nothing
+                    Rdr3 = Nothing
                     'thi is where the date of acquisition is added to the table
 
                     'Dim TransList As New List(Of Trans)
@@ -556,6 +560,7 @@ Public Class Form1
                     sAccountID = 0
                     sOrderID = 0
 
+
                     For Each Extract In ExtractList
                         nAccountID = Extract.AccountID
                         nLHID = Extract.LHID
@@ -570,7 +575,7 @@ Public Class Form1
                                  or o.loanid = @iloanid)
                                 Order By o.lh_id desc, o.loanid desc,  o.orderprev desc, o.accountid  "
 
-
+                        'con.Open()
                         cmd = New SqlCommand(sSQL, con)
                         cmd.Parameters.Clear()
                         With cmd.Parameters
@@ -578,16 +583,17 @@ Public Class Form1
                             .Add(New SqlParameter("@ilhid", nLHID))
                             .Add(New SqlParameter("@iloanid", nLoanid))
                         End With
-                        con.Open()
 
-                        Rdr = cmd.ExecuteReader
 
-                        If Rdr.Read() Then
-                            Extract.OrderID = IIf(IsDBNull(Rdr(4)), "", Rdr(4))
+                        Rdr2 = cmd.ExecuteReader
+
+                        If Rdr2.Read() Then
+                            Extract.OrderID = IIf(IsDBNull(Rdr2(4)), "", Rdr2(4))
                             nOrderID = Extract.OrderID
-                            nOrderPrev = IIf(IsDBNull(Rdr(3)), 0, Rdr(3))
+                            nOrderPrev = IIf(IsDBNull(Rdr2(3)), 0, Rdr2(3))
                         End If
-                        Rdr.Close()
+                        Rdr2.Close()
+                        'con.Close()
 
                         sSQL = "SELECT
                                 ft.datecreated
@@ -598,7 +604,7 @@ Public Class Form1
                                 AND (ft.orderid = @iorderid
                                 Or ft.orderid = @iorderprev)"
 
-
+                        'con.Open()
                         cmd = New SqlCommand(sSQL, con)
                         cmd.Parameters.Clear()
                         With cmd.Parameters
@@ -606,14 +612,15 @@ Public Class Form1
                             .Add(New SqlParameter("@iorderid", nOrderID))
                             .Add(New SqlParameter("@iorderprev", nOrderPrev))
                         End With
-                        con.Open()
 
-                        Rdr = cmd.ExecuteReader
-                        If Rdr.Read() Then
-                            Extract.DateOfAcquisition = IIf(IsDBNull(Rdr(0)), "", Rdr(0))
+
+                        Rdr3 = cmd.ExecuteReader
+                        If Rdr3.Read() Then
+                            Extract.DateOfAcquisition = IIf(IsDBNull(Rdr3(0)), "", Rdr3(0))
 
                         End If
-                        Rdr.Close()
+                        Rdr3.Close()
+                        'con.Close()
 
                         xLatestAccount = Extract.AccountID & " - " & Extract.Firstname.Trim & " " & Extract.LastName.Trim
                         nAccountID = Extract.AccountID
