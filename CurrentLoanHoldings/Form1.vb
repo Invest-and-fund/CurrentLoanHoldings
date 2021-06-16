@@ -83,35 +83,20 @@ Public Class Form1
                 command.CommandType = CommandType.Text
                 
                 Try
-                    sSQL = "CREATE OR ALTER VIEW LH_POS_BALANCES(
-                      ACCOUNTID,
-                      LH_ID,
+                sSQL = "CREATE OR ALTER VIEW LH_POS_BALANCES(
+                   ACCOUNTID,
+                    LH_ID,
                     LH_BALS_ID,
                     NUM_UNITS)
                     AS
-                    select t.accountid, t.lh_id, maxlhbalsid, t.num_units
-                   from
-                      (
-                    select  max(l.lh_bals_id) as maxlhbalsid,l.lhid_accid, lh_id, accountid
-                      from lh_bals l
-                 where lh_id >= 0
-                  and l.datecreated < '" & DisplayDate & "'
-                  group by l.lhid_accid, lh_id, accountid
-                  order by lhid_accid
-                     ) vt
-                      inner join lh_bals t on t.lh_bals_id = vt.maxlhbalsid
-                      where t.num_units > 0
-                     ;"
-
-
-                sSQL = "SELECT   t.ACCOUNTID, t.LH_ID, vt.maxlhbalsid AS LH_BALS_ID, t.NUM_UNITS
+                    SELECT   t.ACCOUNTID, t.LH_ID, vt.maxlhbalsid AS LH_BALS_ID, t.NUM_UNITS
                         FROM      
                     (SELECT   MAX(LH_BALS_ID) AS maxlhbalsid, LHID_ACCID, LH_ID, ACCOUNTID
                        FROM      dbo.LH_BALS AS l
                          WHERE   (LH_ID >= 0) AND (DATECREATED < '" & DisplayDate & "')
                       GROUP BY LHID_ACCID, LH_ID, ACCOUNTID) AS vt INNER JOIN
                      dbo.LH_BALS AS t ON t.LH_BALS_ID = vt.maxlhbalsid
-                    WHERE   (t.NUM_UNITS > 0) "
+                    WHERE   (t.NUM_UNITS > 0) ; "
                 command.CommandText = sSQL
                     command.ExecuteNonQuery()
 
@@ -126,27 +111,14 @@ Public Class Form1
                     LH_BALS_ID,
                     NUM_UNITS)
                     AS
-                   select vt.accountid, lh_id, max_lh_bals_sus_id, t.num_units
-                   from 
-                    ( 
-                    select accountid, max(lh_bals_suspense_id) as max_lh_bals_sus_id
-                    from lh_bals_suspense s
-                    where lh_id > 0
-                   and s.datecreated < '" & DisplayDate & "'
-                  group by accountid, lh_id
-                   ) vt
-                  inner join lh_bals_suspense t on t.lh_bals_suspense_id = vt.max_lh_bals_sus_id
-                   where t.num_units > 0
-                     ;"
-
-                sSQL = "SELECT   vt.ACCOUNTID, t.LH_ID, vt.max_lh_bals_sus_id AS LH_BALS_ID, t.NUM_UNITS
+                     SELECT   vt.ACCOUNTID, t.LH_ID, vt.max_lh_bals_sus_id AS LH_BALS_ID, t.NUM_UNITS
                        FROM     
                  (SELECT   ACCOUNTID, MAX(LH_BALS_SUSPENSE_ID) AS max_lh_bals_sus_id
                     FROM      dbo.LH_BALS_SUSPENSE AS s
                      WHERE   (LH_ID > 0) AND (DATECREATED < '" & DisplayDate & "')
                          GROUP BY ACCOUNTID, LH_ID) AS vt INNER JOIN
                      dbo.LH_BALS_SUSPENSE AS t ON t.LH_BALS_SUSPENSE_ID = vt.max_lh_bals_sus_id
-                    WHERE   (t.NUM_UNITS > 0)"
+                    WHERE   (t.NUM_UNITS > 0) ;"
                 command.CommandText = sSQL
                     command.ExecuteNonQuery()
                 Catch ex As Exception
