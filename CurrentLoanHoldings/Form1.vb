@@ -102,7 +102,17 @@ Public Class Form1
                       inner join lh_bals t on t.lh_bals_id = vt.maxlhbalsid
                       where t.num_units > 0
                      ;"
-                    command.CommandText = sSQL
+
+
+                sSQL = "SELECT   t.ACCOUNTID, t.LH_ID, vt.maxlhbalsid AS LH_BALS_ID, t.NUM_UNITS
+                        FROM      
+                    (SELECT   MAX(LH_BALS_ID) AS maxlhbalsid, LHID_ACCID, LH_ID, ACCOUNTID
+                       FROM      dbo.LH_BALS AS l
+                         WHERE   (LH_ID >= 0) AND (DATECREATED < '" & DisplayDate & "')
+                      GROUP BY LHID_ACCID, LH_ID, ACCOUNTID) AS vt INNER JOIN
+                     dbo.LH_BALS AS t ON t.LH_BALS_ID = vt.maxlhbalsid
+                    WHERE   (t.NUM_UNITS > 0) "
+                command.CommandText = sSQL
                     command.ExecuteNonQuery()
 
                 Catch ex As Exception
@@ -128,7 +138,16 @@ Public Class Form1
                   inner join lh_bals_suspense t on t.lh_bals_suspense_id = vt.max_lh_bals_sus_id
                    where t.num_units > 0
                      ;"
-                    command.CommandText = sSQL
+
+                sSQL = "SELECT   vt.ACCOUNTID, t.LH_ID, vt.max_lh_bals_sus_id AS LH_BALS_ID, t.NUM_UNITS
+                       FROM     
+                 (SELECT   ACCOUNTID, MAX(LH_BALS_SUSPENSE_ID) AS max_lh_bals_sus_id
+                    FROM      dbo.LH_BALS_SUSPENSE AS s
+                     WHERE   (LH_ID > 0) AND (DATECREATED < '" & DisplayDate & "')
+                         GROUP BY ACCOUNTID, LH_ID) AS vt INNER JOIN
+                     dbo.LH_BALS_SUSPENSE AS t ON t.LH_BALS_SUSPENSE_ID = vt.max_lh_bals_sus_id
+                    WHERE   (t.NUM_UNITS > 0)"
+                command.CommandText = sSQL
                     command.ExecuteNonQuery()
                 Catch ex As Exception
 
